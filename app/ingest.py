@@ -6,6 +6,8 @@ from .config import settings
 from .db import SessionLocal
 from .models import Message
 from .utils import compose_message_id
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Initialize Slack app
 app = App(token=settings.SLACK_BOT_TOKEN)
@@ -73,7 +75,7 @@ def upsert_message(db: Session, event: dict):
 
 
 @app.event("message")
-def handle_message_events(body, event, logger):
+def handle_message_store(body, event, logger):
     """Triggered for every message (new, edit, delete)."""
     subtype = event.get("subtype")
 
@@ -84,6 +86,7 @@ def handle_message_events(body, event, logger):
     with SessionLocal() as db:
         upsert_message(db, event)
         db.commit()
+        print(f"💾 Stored message from {event.get('user')} in {event.get('channel')}: {event.get('text')}")
 
 
 @app.event("reaction_added")
@@ -95,6 +98,13 @@ def handle_reaction_added(body, event, logger):
 def handle_reaction_removed(body, event, logger):
     logger.info(f"reaction_removed: {json.dumps(event)[:120]}")
 
+# Debug handler — log every incoming event
+@app.event({"type": "message"})
+def handle_message_events(event, say):
+    user = event.get("user")
+    text = event.get("text")
+    channel = event.get("channel")
+    print(f"🔔 Received message: user={user}, channel={channel}, text={text}")
 
 if __name__ == "__main__":
     handler = SocketModeHandler(app, settings.SLACK_APP_TOKEN)
